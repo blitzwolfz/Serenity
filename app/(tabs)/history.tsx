@@ -140,8 +140,17 @@ export default function HistoryScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
+        <View style={styles.headerRow}>
           <Text style={[styles.title, { color: colors.text }]}>Mood History</Text>
+          <TouchableOpacity
+            style={styles.statsButton}
+            onPress={() => {
+              setSelectedMood(null); // Optional: deselect any mood
+              setModalVisible(true); // Reuse the modal to show stats
+            }}
+          >
+            <Text style={[styles.statsButtonText, { color: colors.primary }]}>Stats</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.periodSelector}>
@@ -244,7 +253,7 @@ export default function HistoryScreen() {
               <X size={24} color={colors.text} />
             </Pressable>
 
-            {selectedMood && (
+            {selectedMood ? (
               <>
                 <Text style={[styles.modalTitle, { color: colors.text }]}>{selectedMood.label}</Text>
                 <Text style={[styles.modalMood, { color: colors.primary }]}>
@@ -272,6 +281,21 @@ export default function HistoryScreen() {
                   </View>
                 )}
               </>
+            ) : (
+              moodStats && (
+                <>
+                  <Text style={[styles.modalTitle, { color: colors.text }]}>Mood Statistics</Text>
+                  <Text style={[styles.modalNote, { color: colors.textSecondary, marginBottom: 16 }]}>
+                    Average Mood for {period.charAt(0).toUpperCase() + period.slice(1)}: {moodStats.average}/5
+                  </Text>
+                  <View style={styles.statsContainer}>
+                    <Text style={[styles.statText, { color: colors.text }]}>Average Mood: {moodStats.average}</Text>
+                    <Text style={[styles.statText, { color: colors.text }]}>Highest Mood: {moodStats.max}</Text>
+                    <Text style={[styles.statText, { color: colors.text }]}>Lowest Mood: {moodStats.min}</Text>
+                    <Text style={[styles.statText, { color: colors.text }]}>Total Entries: {moodStats.total}</Text>
+                  </View>
+                </>
+              )
             )}
           </View>
         </View>
@@ -283,8 +307,22 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: { padding: 24 },
-  header: { marginBottom: 24 },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
   title: { fontFamily: 'Inter-SemiBold', fontSize: 24 },
+  statsButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+  },
+  statsButtonText: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 14,
+  },
   periodSelector: { flexDirection: 'row', marginBottom: 16 },
   periodButton: { flex: 1, paddingVertical: 8, alignItems: 'center', marginHorizontal: 4, borderRadius: 8 },
   periodText: { fontFamily: 'Inter-Medium', fontSize: 14 },
