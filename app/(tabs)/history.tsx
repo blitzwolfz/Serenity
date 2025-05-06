@@ -109,7 +109,7 @@ export default function HistoryScreen() {
   const moodStats = useMemo(() => {
     const validMoods = groupedData.filter((entry) => entry.mood != null).map((entry) => entry.mood);
     if (validMoods.length === 0) return null;
-    const average = (validMoods.reduce((a, b) => a + b, 0) / validMoods.length).toFixed(1);
+    const average = (validMoods.reduce((a, b) => a + b, 0) / validMoods.length);
     const max = Math.max(...validMoods);
     const min = Math.min(...validMoods);
     const total = validMoods.length;

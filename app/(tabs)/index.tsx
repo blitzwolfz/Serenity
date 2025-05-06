@@ -59,7 +59,9 @@ export default function TodayScreen() {
 
   const showSavedBanner = () => {
     savedBannerOpacity.value = withTiming(1, { duration: 300 }, () => {
-      savedBannerOpacity.value = withTiming(0, { duration: 300, delay: 2000 });
+      // savedBannerOpacity.value = withTiming(0, { duration: 300, delay: 2000 });
+      savedBannerOpacity.value = withTiming(0, { duration: 300 });
+
     });
   };
 
