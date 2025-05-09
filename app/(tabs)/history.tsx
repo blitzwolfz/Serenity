@@ -16,6 +16,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useMoodContext } from '@/context/AppContext';
 import { formatDateRange, groupMoodsByPeriod } from '@/utils/dateUtils';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react-native';
+import { LineChart } from 'react-native-chart-kit';
 
 const PERIODS = ['week', 'month', 'year'] as const;
 type PeriodType = typeof PERIODS[number];
@@ -47,6 +48,7 @@ export default function HistoryScreen() {
   useFocusEffect(
     useCallback(() => {
       updateData();
+      // console.log(moods)
     }, [updateData])
   );
 
@@ -109,7 +111,7 @@ export default function HistoryScreen() {
   const moodStats = useMemo(() => {
     const validMoods = groupedData.filter((entry) => entry.mood != null).map((entry) => entry.mood);
     if (validMoods.length === 0) return null;
-    const average = (validMoods.reduce((a, b) => a + b, 0) / validMoods.length);
+    const average = (validMoods.reduce((a, b) => a + b, 0) / validMoods.length).toPrecision(2);
     const max = Math.max(...validMoods);
     const min = Math.min(...validMoods);
     const total = validMoods.length;
@@ -131,6 +133,15 @@ export default function HistoryScreen() {
     ]).start(() => {
       openModal(item);
     });
+  };
+
+  const chartData = {
+    labels: groupedData.map(entry => entry.label),
+    datasets: [
+      {
+        data: groupedData.map(entry => entry.mood || 0),
+      },
+    ],
   };
 
   return (
@@ -263,7 +274,11 @@ export default function HistoryScreen() {
                 {period === 'week' ? (
                   <Text style={[styles.modalNote, { color: colors.textSecondary, marginBottom: 16 }]}>
                     {selectedMood.note ? `"${selectedMood.note}"` : 'No note added.'}
+                    <View style={styles.chartContainer}>
+
+                </View>
                   </Text>
+                  
                 ) : (
                   moodStats && (
                     <Text style={[styles.modalNote, { color: colors.textSecondary, marginBottom: 16 }]}>
@@ -271,10 +286,30 @@ export default function HistoryScreen() {
                     </Text>
                   )
                 )}
-
+                  <LineChart
+                    data={chartData}
+                    width={width-100}
+                    height={220}
+                    chartConfig={{
+                      backgroundColor: '#1e1e1e',
+                      backgroundGradientFrom: '#1e1e1e',
+                      backgroundGradientTo: '#2c2c2c',
+                      decimalPlaces: 1,
+                      color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                      labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                      style: {
+                        borderRadius: 16,
+                      },
+                    }}
+                    bezier
+                    style={{
+                      marginVertical: 8,
+                      borderRadius: 16,
+                    }}
+                  />
                 {moodStats && (
                   <View style={styles.statsContainer}>
-                    <Text style={[styles.statText, { color: colors.text }]}>Average Mood: {moodStats.average}</Text>
+                    {/* <Text style={[styles.statText, { color: colors.text }]}>Average Mood: {moodStats.average}</Text> */}
                     <Text style={[styles.statText, { color: colors.text }]}>Highest Mood: {moodStats.max}</Text>
                     <Text style={[styles.statText, { color: colors.text }]}>Lowest Mood: {moodStats.min}</Text>
                     <Text style={[styles.statText, { color: colors.text }]}>Total Entries: {moodStats.total}</Text>
@@ -347,7 +382,11 @@ const styles = StyleSheet.create({
   modalTitle: { fontFamily: 'Inter-SemiBold', fontSize: 18, marginBottom: 8 },
   modalMood: { fontFamily: 'Inter-Bold', fontSize: 24, marginBottom: 8 },
   modalNote: { fontFamily: 'Inter-Regular', fontSize: 14, fontStyle: 'italic', textAlign: 'center', marginTop: 4 },
-  modalCloseButton: { position: 'absolute', top: 12, right: 12 },
+  modalCloseButton: { position: 'absolute', top: 12, right: 12, marginTop: 16, },
   statsContainer: { marginTop: 8, width: '100%', alignItems: 'flex-start' },
   statText: { fontFamily: 'Inter-Regular', fontSize: 14, marginVertical: 2 },
+  chartContainer: {
+    width: '100%',
+    marginTop: 20,
+  },
 });
