@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { Calendar } from 'react-native-calendars';
 import { useTheme } from '@/hooks/useTheme';
 import { getMoodEntries } from '@/utils/storage';
@@ -49,14 +49,18 @@ export default function TrackerScreen() {
   );
 
   const handleDayPress = (day) => {
-    const selectedLocalDate = format(new Date(day.dateString), 'yyyy-MM-dd');
+    const selectedLocalDate = format(parseISO(day.dateString), 'yyyy-MM-dd');
     setSelectedDate(selectedLocalDate);
 
     const entry = moodEntries.find(e => e.date === selectedLocalDate);
 
+    console.log('Selected date:', selectedLocalDate);
+    console.log('Entry:', entry);
+    console.log('Mood entries:', moodEntries);
+
     if (entry) {
       setSelectedEntry(entry);
-    } else if (selectedLocalDate === today) {
+    } else {
       setSelectedEntry(null);
     }
 
@@ -117,7 +121,7 @@ export default function TrackerScreen() {
           </Text>
           <View style={styles.recentEntries}>
             {moodEntries
-              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+              .sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime())
               .slice(0, 3)
               .map(entry => (
                 <TouchableOpacity
@@ -129,13 +133,14 @@ export default function TrackerScreen() {
                   onPress={() => {
                     setSelectedDate(entry.date);
                     setSelectedEntry(entry);
+                    console.log('Selected entry:', entry);
                     setIsBottomSheetVisible(true);
                   }}
                 >
                   <View style={[styles.moodColor, { backgroundColor: entry.color }]} />
                   <View style={styles.entryDetails}>
                     <Text style={[styles.entryDate, { color: colors.text }]}>
-                      {format(new Date(entry.date), 'EEEE, MMM d')}
+                      {format(parseISO(entry.date), 'EEEE, MMM d')}
                     </Text>
                     <Text style={[styles.entryRating, { color: colors.textSecondary }]}>
                       Rating: {entry.rating}/5
