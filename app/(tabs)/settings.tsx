@@ -1,281 +1,229 @@
-import { useState, useEffect } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  TouchableOpacity,
-  Switch,
-  Alert,
-  Platform,
-  ScrollView
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme } from '@/context/ThemeContext';
-import { useMoodContext } from '@/context/AppContext';
-import * as Notifications from 'expo-notifications';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import {
-  Moon,
-  Sun,
-  Bell,
-  Download,
-  Trash2,
-  ChevronRight,
-  Info
-} from 'lucide-react-native';
-
-// Keys for storage
-const NOTIFICATION_TIME_KEY = 'moodtrack_notification_time';
-
-// Configure notifications
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
+import React, { useState, useEffect } from 'react';
+import { View, Text, Switch, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { useTheme } from '@/hooks/useTheme';
+import { Moon, Sun, Bell, FileDown, Trash2, Info } from 'lucide-react-native';
+import { saveSettings, getSettings, clearAllData } from '@/utils/storage';
+import { scheduleDailyNotification, cancelNotifications } from '@/utils/notifications';
+import { exportMoodData } from '@/utils/export';
 
 export default function SettingsScreen() {
-  const { theme, colors, toggleTheme } = useTheme();
-  const { exportData, clearAllData, notificationsEnabled, toggleNotifications } = useMoodContext();
-
+  const { colors, isDark, toggleTheme } = useTheme();
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notificationTime, setNotificationTime] = useState('20:00');
-  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // Load saved time from AsyncStorage
   useEffect(() => {
-    const loadNotificationTime = async () => {
-      const savedTime = await AsyncStorage.getItem(NOTIFICATION_TIME_KEY);
-      if (savedTime) {
-        setNotificationTime(savedTime);
-      }
+    const loadSettings = async () => {
+      const settings = await getSettings();
+      setNotificationsEnabled(settings.notificationsEnabled);
+      setNotificationTime(settings.notificationTime);
     };
-    loadNotificationTime();
+    
+    loadSettings();
   }, []);
 
-  const requestNotificationPermissions = async () => {
-    if (Platform.OS === 'web') return true;
-    const { status } = await Notifications.requestPermissionsAsync();
-    return status === 'granted';
-  };
-
-  const scheduleNotification = async (time: string) => {
-    const [hour, minute] = time.split(':').map(Number);
-    const now = new Date();
-    const firstTrigger = new Date(now);
-    firstTrigger.setHours(hour);
-    firstTrigger.setMinutes(minute);
-    firstTrigger.setSeconds(0);
-
-    if (firstTrigger <= now) {
-      firstTrigger.setDate(firstTrigger.getDate() + 1);
-    }
-
-    await Notifications.cancelAllScheduledNotificationsAsync();
-
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "How are you feeling today?",
-        body: "Take a moment to log your mood in MoodTrack",
-      },
-      trigger: {
-        hour: firstTrigger.getHours(),
-        minute: firstTrigger.getMinutes(),
-        repeats: true,
-      },
-    });
-  };
-
-  const handleToggleNotifications = async (value: boolean) => {
+  const handleToggleNotifications = async (value) => {
+    setNotificationsEnabled(value);
+    await saveSettings({ notificationsEnabled: value, notificationTime });
+    
     if (value) {
-      const permissionGranted = await requestNotificationPermissions();
-      if (!permissionGranted) {
-        if (Platform.OS !== 'web') {
-          Alert.alert('Permission Required', 'Notifications permission is required to enable reminders.', [{ text: 'OK' }]);
-        }
-        return;
-      }
-      await scheduleNotification(notificationTime);
+      scheduleDailyNotification(notificationTime);
     } else {
-      await Notifications.cancelAllScheduledNotificationsAsync();
+      cancelNotifications();
     }
-
-    toggleNotifications(value);
   };
 
-  const handleExportData = async () => {
+  const handleExport = async () => {
+    setLoading(true);
     try {
-      await exportData();
-      if (Platform.OS !== 'web') {
-        Alert.alert('Export Successful', 'Your mood data has been exported successfully.', [{ text: 'OK' }]);
-      }
+      await exportMoodData();
+      Alert.alert(
+        'Export Successful',
+        'Your mood data has been exported successfully.'
+      );
     } catch (error) {
-      if (Platform.OS !== 'web') {
-        Alert.alert('Export Failed', 'There was an error exporting your mood data.', [{ text: 'OK' }]);
-      }
+      Alert.alert(
+        'Export Failed',
+        'There was an error exporting your mood data.'
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleClearData = () => {
-    const confirmClear = () => {
-      clearAllData();
-      if (Platform.OS !== 'web') {
-        Alert.alert('Data Cleared', 'All your mood data has been deleted.', [{ text: 'OK' }]);
-      }
-    };
-
-    if (Platform.OS !== 'web') {
-      Alert.alert('Clear All Data', 'Are you sure you want to delete all your mood data? This action cannot be undone.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', onPress: confirmClear, style: 'destructive' }
-      ]);
-    } else {
-      if (confirm('Are you sure you want to delete all your mood data? This action cannot be undone.')) {
-        confirmClear();
-      }
-    }
-  };
-
-  const handleTimePicked = async (event: any, date: Date | undefined) => {
-    setShowTimePicker(false);
-    if (date) {
-      const hours = date.getHours().toString().padStart(2, '0');
-      const minutes = date.getMinutes().toString().padStart(2, '0');
-      const formattedTime = `${hours}:${minutes}`;
-
-      setNotificationTime(formattedTime);
-      await AsyncStorage.setItem(NOTIFICATION_TIME_KEY, formattedTime);
-
-      if (notificationsEnabled) {
-        await scheduleNotification(formattedTime);
-      }
-    }
+  const handleReset = () => {
+    Alert.alert(
+      'Reset All Data',
+      'Are you sure you want to reset all your mood data? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            await clearAllData();
+            Alert.alert(
+              'Data Reset',
+              'All mood data has been reset successfully.'
+            );
+          },
+        },
+      ]
+    );
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Settings</Text>
-        </View>
-
-        <View style={styles.settingsGroup}>
-          <Text style={[styles.groupTitle, { color: colors.textSecondary }]}>Appearance</Text>
-          <View style={[styles.settingsItem, { backgroundColor: colors.cardBackground }]}>
-            <View style={styles.settingInfo}>
-              {theme === 'dark' ? <Moon size={22} color={colors.text} /> : <Sun size={22} color={colors.text} />}
-              <Text style={[styles.settingLabel, { color: colors.text }]}>Dark Mode</Text>
-            </View>
-            <Switch
-              value={theme === 'dark'}
-              onValueChange={toggleTheme}
-              trackColor={{ false: '#767577', true: colors.primaryLight }}
-              thumbColor={theme === 'dark' ? colors.primary : '#f4f3f4'}
-            />
-          </View>
-        </View>
-
-        <View style={styles.settingsGroup}>
-          <Text style={[styles.groupTitle, { color: colors.textSecondary }]}>Notifications</Text>
-
-          <View style={[styles.settingsItem, { backgroundColor: colors.cardBackground }]}>
-            <View style={styles.settingInfo}>
-              <Bell size={22} color={colors.text} />
-              <Text style={[styles.settingLabel, { color: colors.text }]}>Daily Reminder</Text>
-            </View>
-            <Switch
-              value={notificationsEnabled}
-              onValueChange={handleToggleNotifications}
-              trackColor={{ false: '#767577', true: colors.primaryLight }}
-              thumbColor={notificationsEnabled ? colors.primary : '#f4f3f4'}
-            />
-          </View>
-
-          {Platform.OS !== 'web' && notificationsEnabled && (
-            <>
-              <TouchableOpacity
-                style={[styles.settingsItem, { backgroundColor: colors.cardBackground }]}
-                onPress={() => setShowTimePicker(true)}
-              >
-                <View style={styles.settingInfo}>
-                  <Text style={[styles.settingLabel, { color: colors.text }]}>Reminder Time</Text>
-                </View>
-                <View style={styles.settingAction}>
-                  <Text style={[styles.timeText, { color: colors.textSecondary }]}>{notificationTime}</Text>
-                  <ChevronRight size={18} color={colors.textTertiary} />
-                </View>
-              </TouchableOpacity>
-
-              {showTimePicker && (
-                <DateTimePicker
-                  mode="time"
-                  value={new Date(`1970-01-01T${notificationTime}:00`)}
-                  onChange={handleTimePicked}
-                />
-              )}
-            </>
-          )}
-        </View>
-
-        <View style={styles.settingsGroup}>
-          <Text style={[styles.groupTitle, { color: colors.textSecondary }]}>Data Management</Text>
-
-          <TouchableOpacity
-            style={[styles.settingsItem, { backgroundColor: colors.cardBackground }]}
-            onPress={handleExportData}
-          >
-            <View style={styles.settingInfo}>
-              <Download size={22} color={colors.text} />
-              <Text style={[styles.settingLabel, { color: colors.text }]}>Export Data</Text>
-            </View>
-            <ChevronRight size={18} color={colors.textTertiary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.settingsItem, { backgroundColor: colors.cardBackground }]}
-            onPress={handleClearData}
-          >
-            <View style={styles.settingInfo}>
-              <Trash2 size={22} color="#E76F51" />
-              <Text style={[styles.settingLabel, { color: '#E76F51' }]}>Clear All Data</Text>
-            </View>
-            <ChevronRight size={18} color={colors.textTertiary} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.settingsGroup}>
-          <Text style={[styles.groupTitle, { color: colors.textSecondary }]}>About</Text>
-          <View style={[styles.settingsItem, { backgroundColor: colors.cardBackground }]}>
-            <View style={styles.settingInfo}>
-              <Info size={22} color={colors.text} />
-              <Text style={[styles.settingLabel, { color: colors.text }]}>Version</Text>
-            </View>
-            <Text style={[styles.versionText, { color: colors.textSecondary }]}>1.0.0</Text>
-          </View>
-        </View>
-
-        <Text style={[styles.footerText, { color: colors.textTertiary }]}>
-          All data is stored locally on your device.
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={styles.headerContainer}>
+        <Text style={[styles.header, { color: colors.text }]}>Settings</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+          Customize your mood tracking experience
         </Text>
-      </ScrollView>
-    </SafeAreaView>
+      </View>
+      
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Appearance</Text>
+        <View style={[styles.settingItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.settingContent}>
+            {isDark ? <Moon size={24} color={colors.text} /> : <Sun size={24} color={colors.text} />}
+            <Text style={[styles.settingText, { color: colors.text }]}>Dark Theme</Text>
+          </View>
+          <Switch
+            value={isDark}
+            onValueChange={toggleTheme}
+            trackColor={{ false: '#767577', true: colors.primary }}
+            thumbColor="#f4f3f4"
+          />
+        </View>
+      </View>
+      
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Notifications</Text>
+        <View style={[styles.settingItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.settingContent}>
+            <Bell size={24} color={colors.text} />
+            <Text style={[styles.settingText, { color: colors.text }]}>Daily Reminder</Text>
+          </View>
+          <Switch
+            value={notificationsEnabled}
+            onValueChange={handleToggleNotifications}
+            trackColor={{ false: '#767577', true: colors.primary }}
+            thumbColor="#f4f3f4"
+          />
+        </View>
+        {notificationsEnabled && (
+          <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>
+            You'll receive a reminder at 8:00 PM each day to log your mood.
+          </Text>
+        )}
+      </View>
+      
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Data Management</Text>
+        <TouchableOpacity
+          style={[styles.settingButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={handleExport}
+          disabled={loading}
+        >
+          <View style={styles.settingContent}>
+            <FileDown size={24} color={colors.text} />
+            <Text style={[styles.settingText, { color: colors.text }]}>
+              {loading ? 'Exporting...' : 'Export Data'}
+            </Text>
+          </View>
+        </TouchableOpacity>
+        <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>
+          Export your mood data as a CSV or JSON file.
+        </Text>
+        
+        <TouchableOpacity
+          style={[styles.settingButton, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 16 }]}
+          onPress={handleReset}
+        >
+          <View style={styles.settingContent}>
+            <Trash2 size={24} color={colors.errorText} />
+            <Text style={[styles.settingText, { color: colors.errorText }]}>Reset All Data</Text>
+          </View>
+        </TouchableOpacity>
+        <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>
+          Delete all your mood tracking data. This cannot be undone.
+        </Text>
+      </View>
+      
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>About</Text>
+        <View style={[styles.settingItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.settingContent}>
+            <Info size={24} color={colors.text} />
+            <View>
+              <Text style={[styles.settingText, { color: colors.text }]}>Mood Tracker</Text>
+              <Text style={[styles.settingDescription, { color: colors.textSecondary, marginTop: 2 }]}>
+                Version 1.0.0
+              </Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  scrollContent: { padding: 24 },
-  header: { marginBottom: 32 },
-  title: { fontFamily: 'Inter-SemiBold', fontSize: 24 },
-  settingsGroup: { marginBottom: 32 },
-  groupTitle: { fontFamily: 'Inter-Medium', fontSize: 14, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
-  settingsItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderRadius: 12, marginBottom: 8 },
-  settingInfo: { flexDirection: 'row', alignItems: 'center' },
-  settingLabel: { fontFamily: 'Inter-Medium', fontSize: 16, marginLeft: 12 },
-  settingAction: { flexDirection: 'row', alignItems: 'center' },
-  timeText: { fontFamily: 'Inter-Regular', fontSize: 14, marginRight: 8 },
-  versionText: { fontFamily: 'Inter-Regular', fontSize: 14 },
-  footerText: { fontFamily: 'Inter-Regular', fontSize: 14, textAlign: 'center', marginTop: 16, marginBottom: 32 },
+  container: {
+    flex: 1,
+  },
+  headerContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    marginBottom: 24,
+  },
+  header: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  subtitle: {
+    fontSize: 16,
+    marginTop: 4,
+  },
+  section: {
+    marginBottom: 24,
+    paddingHorizontal: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  settingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  settingButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  settingContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  settingText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  settingDescription: {
+    fontSize: 14,
+    marginTop: 8,
+    paddingHorizontal: 4,
+  },
 });
