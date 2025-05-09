@@ -1,45 +1,47 @@
 import { Tabs } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
-import { useTheme } from '@/context/ThemeContext';
-import { ChartBar as BarChart2, CalendarDays, Settings } from 'lucide-react-native';
+import { useColorScheme } from 'react-native';
+import { Calendar, BarChart3, Settings } from 'lucide-react-native';
+import { useTheme } from '@/hooks/useTheme';
 
 export default function TabLayout() {
-  const { theme, colors } = useTheme();
-  
+  const colorScheme = useColorScheme();
+  const { colors } = useTheme();
+
   return (
     <Tabs
       screenOptions={{
-        tabBarStyle: {
-          backgroundColor: colors.cardBackground,
-          borderTopColor: colors.border,
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 8,
-        },
         tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textSecondary,
-        tabBarLabelStyle: {
-          fontFamily: 'Inter-Medium',
-          fontSize: 12,
+        tabBarInactiveTintColor: colors.text,
+        tabBarStyle: {
+          backgroundColor: colors.card,
+          borderTopColor: colors.border,
         },
-        headerShown: false,
+        headerStyle: {
+          backgroundColor: colors.card,
+        },
+        headerTintColor: colors.text,
+        headerShadowVisible: false,
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '500',
+        },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Today',
+          title: 'Tracker',
           tabBarIcon: ({ color, size }) => (
-            <CalendarDays size={size} color={color} />
+            <Calendar size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="history"
+        name="analytics"
         options={{
-          title: 'History',
+          title: 'Analytics',
           tabBarIcon: ({ color, size }) => (
-            <BarChart2 size={size} color={color} />
+            <BarChart3 size={size} color={color} />
           ),
         }}
       />
