@@ -256,8 +256,11 @@ export default function AnalyticsScreen() {
         <View style={styles.statsContainer}>
           <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.statTitle, { color: colors.textSecondary }]}>Average Mood</Text>
-            <Text style={[styles.statValue, { color: colors.text }]}>
-              {(aggregatedData.reduce((sum, item) => sum + item.rating, 0) / aggregatedData.length).toFixed(1)}
+            <Text style={[styles.statValue, { color: colors.text }]}> 
+              {(
+                aggregatedData.filter(d => d.rating !== null).reduce((sum, d) => sum + d.rating, 0) /
+                aggregatedData.filter(d => d.rating !== null).length
+              ).toFixed(1)}
             </Text>
           </View>
           

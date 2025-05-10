@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput,
-  Pressable, Alert, TouchableWithoutFeedback, Keyboard, Platform
+  Pressable, Alert, TouchableWithoutFeedback,
+  Keyboard, KeyboardEvent, Platform
 } from 'react-native';
 import BottomSheet, { BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import { format, parse } from 'date-fns';
@@ -24,10 +25,12 @@ export default function MoodBottomSheet({
 }: MoodBottomSheetProps) {
   const { colors } = useTheme();
   const bottomSheetRef = useRef<BottomSheet>(null);
+
   const [rating, setRating] = useState(existingEntry?.rating || 3);
   const [color, setColor] = useState(existingEntry?.color || getMoodColor(3));
   const [note, setNote] = useState(existingEntry?.note || '');
   const [isEditing, setIsEditing] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
     if (existingEntry) {
@@ -50,6 +53,29 @@ export default function MoodBottomSheet({
       bottomSheetRef.current?.close();
     }
   }, [isVisible]);
+
+  useEffect(() => {
+    const handleKeyboardShow = (event: KeyboardEvent) => {
+      setKeyboardVisible(true);
+      bottomSheetRef.current?.expand();
+    };
+
+    const handleKeyboardHide = () => setKeyboardVisible(false);
+
+    const showListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      handleKeyboardShow
+    );
+    const hideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      handleKeyboardHide
+    );
+
+    return () => {
+      showListener.remove();
+      hideListener.remove();
+    };
+  }, []);
 
   const handleSheetChanges = useCallback((index: number) => {
     if (index === -1) {
@@ -125,11 +151,11 @@ export default function MoodBottomSheet({
     []
   );
 
-  const snapPoints = useMemo(() => ['50%', '75%'], []);
-  // const formattedDate = date ? format(new Date(date), 'EEEE, MMMM d, yyyy') : '';
+  const snapPoints = useMemo(() => (keyboardVisible ? ['90%'] : ['50%', '75%']), [keyboardVisible]);
+
   const formattedDate = date
-  ? format(parse(date, 'yyyy-MM-dd', new Date()), 'EEEE, MMMM d, yyyy')
-  : '';
+    ? format(parse(date, 'yyyy-MM-dd', new Date()), 'EEEE, MMMM d, yyyy')
+    : '';
 
   return (
     <BottomSheet
